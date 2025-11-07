@@ -1,4 +1,4 @@
-const express = require('express');
+const express = require("express");
 const app = express();
 const PORT = 3000;
 
@@ -6,8 +6,8 @@ const PORT = 3000;
 app.use(express.json());
 
 // Route cơ bản
-app.get('/', (req, res) => {
-  res.send('Hello Express Backend!');
+app.get("/", (req, res) => {
+  res.send("Welcomt to  GymStar");
 });
 
 // Lắng nghe server
