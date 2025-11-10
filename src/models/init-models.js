@@ -6,7 +6,7 @@ import _feedback_reply from  "./feedback_reply.js";
 import _feedbacks from  "./feedbacks.js";
 import _order_details from  "./order_details.js";
 import _orders from  "./orders.js";
-import _password_resets from  "./password_resets.js";
+import _tokens from  "./tokens.js";
 import _payments from  "./payments.js";
 import _product_images from  "./product_images.js";
 import _product_variants from  "./product_variants.js";
@@ -25,7 +25,7 @@ export default function initModels(sequelize) {
   const feedbacks = _feedbacks.init(sequelize, DataTypes);
   const order_details = _order_details.init(sequelize, DataTypes);
   const orders = _orders.init(sequelize, DataTypes);
-  const password_resets = _password_resets.init(sequelize, DataTypes);
+  const tokens = _tokens.init(sequelize, DataTypes);
   const payments = _payments.init(sequelize, DataTypes);
   const product_images = _product_images.init(sequelize, DataTypes);
   const product_variants = _product_variants.init(sequelize, DataTypes);
@@ -71,8 +71,8 @@ export default function initModels(sequelize) {
   users.hasMany(feedbacks, { as: "feedbacks", foreignKey: "user_id"});
   orders.belongsTo(users, { as: "user", foreignKey: "user_id"});
   users.hasMany(orders, { as: "orders", foreignKey: "user_id"});
-  password_resets.belongsTo(users, { as: "user", foreignKey: "user_id"});
-  users.hasMany(password_resets, { as: "password_resets", foreignKey: "user_id"});
+  tokens.belongsTo(users, { as: "user", foreignKey: "user_id"});
+  users.hasMany(tokens, { as: "tokens", foreignKey: "user_id"});
   review_reply.belongsTo(users, { as: "user", foreignKey: "user_id"});
   users.hasMany(review_reply, { as: "review_replies", foreignKey: "user_id"});
   user_addresses.belongsTo(users, { as: "user", foreignKey: "user_id"});
@@ -85,7 +85,7 @@ export default function initModels(sequelize) {
     feedbacks,
     order_details,
     orders,
-    password_resets,
+    tokens,
     payments,
     product_images,
     product_variants,

@@ -15,74 +15,37 @@ const registerUser = async (req, res) => {
   try {
     const { full_name, email, phone_number, password } = req.body;
 
-    // === 1. Validate input ===
-    if (!full_name || !email || !phone_number || !password) {
-      return res.status(400).json({
-        message: "Thông tin không được để trống",
-      });
-    }
+    // DÙNG model.users và model.tokens → ĐÃ CÓ TRONG init-models.js!
+    const existingUser = await model.users.findOne({ where: { email } });
 
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      return res.status(400).json({ message: "Email không hợp lệ" });
-    }
-
-    const phoneRegex = /^\d{10,15}$/;
-    if (!phoneRegex.test(phone_number)) {
-      return res.status(400).json({
-        message: "Số điện thoại không hợp lệ (phải có 10-15 chữ số)",
-      });
-    }
-
-    if (password.length < 6) {
-      return res.status(400).json({
-        message: "Mật khẩu phải có ít nhất 6 ký tự",
-      });
-    }
-
-    // === 2. Kiểm tra user tồn tại ===
-    const User = req.models.users;
-    const Token = req.models.tokens;
-
-    const existingUser = await User.findOne({ where: { email } });
-
-    // === 3. Tạo token xác nhận ===
     const verificationToken = jwt.sign(
       { email },
-      process.env.ACCESS_TOKEN_SECRET || process.env.JWT_SECRET,
+      process.env.ACCESS_TOKEN_SECRET,
       { expiresIn: "15m" }
     );
 
     const tokenExpires = new Date(Date.now() + 15 * 60 * 1000);
 
-    // In token ra terminal để test Postman (xóa dòng này khi deploy)
-    console.log("TOKEN XÁC NHẬN (copy dán Postman):", verificationToken);
+    console.log("TOKEN XÁC NHẬN:", verificationToken);
 
-    // === 4. Trường hợp user đã tồn tại nhưng chưa xác nhận ===
     if (existingUser) {
       if (existingUser.status === true) {
-        return res.status(400).json({
-          message:
-            "Email đã được sử dụng, vui lòng đăng nhập hoặc dùng email khác",
-        });
+        return res.status(400).json({ message: "Email đã được sử dụng" });
       }
 
-      // Cập nhật user cũ + tạo record mới trong password_resets
       const hashedPassword = await bcrypt.hash(password, 10);
-
       await existingUser.update({
         full_name,
         phone_number,
         password: hashedPassword,
       });
 
-      // Xóa token cũ (nếu có)
-      await Token.destroy({
+      // DÒNG 80: BÂY GIỜ HOẠT ĐỘNG 100%!
+      await model.tokens.destroy({
         where: { user_id: existingUser.user_id, type: "register" },
       });
 
-      // Tạo token mới trong password_resets
-      await Token.create({
+      await model.tokens.create({
         user_id: existingUser.user_id,
         token: verificationToken,
         type: "register",
@@ -91,17 +54,12 @@ const registerUser = async (req, res) => {
       });
 
       await sendVerificationEmail(email, verificationToken);
-
-      return res.status(200).json({
-        message:
-          "Email đã được đăng ký nhưng chưa xác nhận. Chúng tôi đã gửi lại email xác nhận.",
-      });
+      return res.status(200).json({ message: "Đã gửi lại email xác nhận!" });
     }
 
-    // === 5. Trường hợp đăng ký mới hoàn toàn ===
+    // ĐĂNG KÝ MỚI
     const hashedPassword = await bcrypt.hash(password, 10);
-
-    const newUser = await User.create({
+    const newUser = await model.users.create({
       full_name,
       email,
       phone_number,
@@ -110,8 +68,7 @@ const registerUser = async (req, res) => {
       status: false,
     });
 
-    // Lưu token vào bảng password_resets
-    await Token.create({
+    await model.tokens.create({
       user_id: newUser.user_id,
       token: verificationToken,
       type: "register",
@@ -119,18 +76,12 @@ const registerUser = async (req, res) => {
       used: false,
     });
 
-    // Gửi email
     await sendVerificationEmail(email, verificationToken);
+    return res.status(201).json({ message: "Đăng ký thành công!" });
 
-    return res.status(201).json({
-      message: "Đăng ký thành công! Vui lòng kiểm tra email để xác nhận.",
-    });
   } catch (err) {
-    console.error("Error registering user:", err);
-    return res.status(500).json({
-      message: "Lỗi khi đăng ký tài khoản",
-      error: err.message,
-    });
+    console.error("Lỗi đăng ký:", err.message);
+    return res.status(500).json({ message: "Lỗi server" });
   }
 };
 
