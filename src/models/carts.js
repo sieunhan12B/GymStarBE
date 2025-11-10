@@ -1,8 +1,8 @@
-import _sequelize from "sequelize";
-const { Model, DataTypes } = _sequelize;
+// models/carts.js
+import { Model, DataTypes } from "sequelize";
 
-export default class carts extends Model {
-  static init(sequelize, DataTypes) {
+export default class Cart extends Model {
+  static init(sequelize) {
     return super.init(
       {
         cart_id: {
@@ -13,16 +13,16 @@ export default class carts extends Model {
         },
         user_id: {
           type: DataTypes.INTEGER,
-          allowNull: false, // Không cho null nữa
-          unique: true, // THÊM DÒNG NÀY → UNIQUE!
+          allowNull: false,
           references: {
             model: "users",
             key: "user_id",
           },
+          // KHÔNG DÙNG unique: true ở đây → vì unique là COMPOSITE (2 cột)
         },
         product_variant_id: {
           type: DataTypes.INTEGER,
-          allowNull: true,
+          allowNull: false, // BẮT BUỘC (trùng SQL)
           references: {
             model: "product_variants",
             key: "product_variant_id",
@@ -30,25 +30,51 @@ export default class carts extends Model {
         },
         quantity: {
           type: DataTypes.INTEGER,
-          allowNull: true,
+          allowNull: false,
           defaultValue: 1,
+          validate: {
+            min: 1,
+          },
+        },
+        created_at: {
+          type: DataTypes.DATE,
+          allowNull: false,
+          defaultValue: DataTypes.NOW,
+        },
+        updated_at: {
+          type: DataTypes.DATE,
+          allowNull: false,
+          defaultValue: DataTypes.NOW,
         },
       },
       {
         sequelize,
+        modelName: "Cart",
         tableName: "carts",
         schema: "public",
         timestamps: true,
+        createdAt: "created_at",
+        updatedAt: "updated_at",
+
+        // ĐÂY LÀ CHỖ QUAN TRỌNG NHẤT: UNIQUE COMPOSITE CHO 2 CỘT
         indexes: [
           {
             name: "carts_pkey",
             unique: true,
-            fields: [{ name: "cart_id" }],
+            fields: ["cart_id"],
           },
           {
-            name: "carts_user_id_unique", // Tên index
+            name: "carts_user_id_product_variant_id_unique", // tên tự đặt
             unique: true,
-            fields: [{ name: "user_id" }], // Tạo unique index cho user_id
+            fields: ["user_id", "product_variant_id"], // ← UNIQUE COMPOSITE ĐÚNG NHƯ SQL
+          },
+          {
+            name: "idx_carts_user_id",
+            fields: ["user_id"],
+          },
+          {
+            name: "idx_carts_variant_id",
+            fields: ["product_variant_id"],
           },
         ],
       }

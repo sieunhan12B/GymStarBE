@@ -42,7 +42,7 @@ const registerUser = async (req, res) => {
 
     // === 2. Kiểm tra user tồn tại ===
     const User = req.models.users;
-    const PasswordReset = req.models.password_resets;
+    const Token = req.models.tokens;
 
     const existingUser = await User.findOne({ where: { email } });
 
@@ -77,12 +77,12 @@ const registerUser = async (req, res) => {
       });
 
       // Xóa token cũ (nếu có)
-      await PasswordReset.destroy({
+      await Token.destroy({
         where: { user_id: existingUser.user_id, type: "register" },
       });
 
       // Tạo token mới trong password_resets
-      await PasswordReset.create({
+      await Token.create({
         user_id: existingUser.user_id,
         token: verificationToken,
         type: "register",
@@ -111,7 +111,7 @@ const registerUser = async (req, res) => {
     });
 
     // Lưu token vào bảng password_resets
-    await PasswordReset.create({
+    await Token.create({
       user_id: newUser.user_id,
       token: verificationToken,
       type: "register",
@@ -202,11 +202,11 @@ const verifyEmail = async (req, res) => {
   }
 
   try {
-    const PasswordReset = req.models.password_resets;
+    const Token = req.models.tokens;
     const User = req.models.users;
 
     // Tìm token (chỉ cần token + type + chưa dùng)
-    const resetRecord = await PasswordReset.findOne({
+    const resetRecord = await Token.findOne({
       where: {
         token,
         type: "register",
@@ -239,12 +239,12 @@ const verifyEmail = async (req, res) => {
       const newExpires = new Date(Date.now() + 15 * 60 * 1000);
 
       // Xóa token cũ
-      await PasswordReset.destroy({
+      await Token.destroy({
         where: { user_id: user.user_id, type: "register" },
       });
 
       // Tạo token mới trong DB
-      await PasswordReset.create({
+      await Token.create({
         user_id: user.user_id,
         token: newToken,
         type: "register",
@@ -320,7 +320,7 @@ const loginUser = async (req, res) => {
     }
 
     const User = req.models.users;
-    const PasswordReset = req.models.password_resets;
+    const Token = req.models.tokens;
 
     const user = await User.findOne({ where: { email } });
     if (!user) {
@@ -363,12 +363,12 @@ const loginUser = async (req, res) => {
     );
 
     // Xóa refresh token cũ
-    await PasswordReset.destroy({
+    await Token.destroy({
       where: { user_id: user.user_id, type: "refresh" },
     });
 
     // Lưu refresh token mới
-    await PasswordReset.create({
+    await Token.create({
       user_id: user.user_id,
       token: refreshToken,
       type: "refresh",
@@ -405,11 +405,11 @@ const refreshTokenRoute = async (req, res) => {
     if (!refreshToken)
       return res.status(401).json({ message: "Thiếu refresh token" });
 
-    const PasswordReset = req.models.password_resets;
+    const Token = req.models.tokens;
     const User = req.models.users;
 
     // Tìm token trong DB
-    const tokenRecord = await PasswordReset.findOne({
+    const tokenRecord = await Token.findOne({
       where: {
         token: refreshToken,
         type: "refresh",
@@ -465,7 +465,7 @@ const refreshTokenRoute = async (req, res) => {
       used: true,
     });
 
-    await PasswordReset.create({
+    await Token.create({
       user_id: user.user_id,
       token: newRefreshToken,
       type: "refresh",
@@ -560,13 +560,13 @@ const logoutUser = async (req, res) => {
   try {
     const { refreshToken, accessToken } = req.body;
 
-    const PasswordReset = req.models.password_resets;
+    const Token = req.models.tokens;
 
     let deleted = 0;
 
     // Ưu tiên xóa bằng refreshToken
     if (refreshToken) {
-      deleted = await PasswordReset.destroy({
+      deleted = await Token.destroy({
         where: { token: refreshToken, type: "refresh" }
       });
     }
@@ -575,7 +575,7 @@ const logoutUser = async (req, res) => {
     else if (accessToken) {
       try {
         const decoded = jwt.verify(accessToken, process.env.ACCESS_TOKEN_SECRET);
-        deleted = await PasswordReset.destroy({
+        deleted = await Token.destroy({
           where: { user_id: decoded.user_id, type: "refresh" }
         });
       } catch (err) {
