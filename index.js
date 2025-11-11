@@ -52,7 +52,7 @@ const app = express();
 // ======================
 const allowedOrigins = [
   "http://localhost:5173",
-  "https://shopquanao-f7yd.onrender.com",
+  "https://gymstarbe.onrender.com",
 ];
 app.use(
   cors({

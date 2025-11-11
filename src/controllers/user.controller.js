@@ -78,7 +78,6 @@ const registerUser = async (req, res) => {
 
     await sendVerificationEmail(email, verificationToken);
     return res.status(201).json({ message: "Đăng ký thành công!" });
-
   } catch (err) {
     console.error("Lỗi đăng ký:", err.message);
     return res.status(500).json({ message: "Lỗi server" });
@@ -490,60 +489,8 @@ const getAllUsers = async (req, res) => {
   }
 };
 
-const protectRoute = async (req, res, next) => {
-  try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return res.status(401).json({ message: "Không có token" });
-    }
 
-    const token = authHeader.split(" ")[1];
-    const decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
 
-    req.user = decoded;
-    next();
-  } catch (err) {
-    return res.status(401).json({ message: "Token hết hạn hoặc không hợp lệ" });
-  }
-};
-
-const logoutUser = async (req, res) => {
-  try {
-    const { refreshToken, accessToken } = req.body;
-
-    const Token = req.models.tokens;
-
-    let deleted = 0;
-
-    // Ưu tiên xóa bằng refreshToken
-    if (refreshToken) {
-      deleted = await Token.destroy({
-        where: { token: refreshToken, type: "refresh" }
-      });
-    }
-
-    // Nếu không có refreshToken nhưng có accessToken → decode để lấy user_id
-    else if (accessToken) {
-      try {
-        const decoded = jwt.verify(accessToken, process.env.ACCESS_TOKEN_SECRET);
-        deleted = await Token.destroy({
-          where: { user_id: decoded.user_id, type: "refresh" }
-        });
-      } catch (err) {
-        // accessToken hết hạn → vẫn OK, vì frontend đã xóa
-      }
-    }
-
-    console.log("ĐĂNG XUẤT THÀNH CÔNG – ĐÃ XÓA REFRESH TOKEN!");
-    return res.status(200).json({ 
-      message: "Đăng xuất thành công! Tất cả thiết bị đã bị đăng xuất." 
-    });
-
-  } catch (err) {
-    console.error("Lỗi đăng xuất:", err.message);
-    return res.status(500).json({ message: "Lỗi hệ thống" });
-  }
-};
 
 // const changePassword = async (req, res) => {
 //   try {
@@ -728,8 +675,6 @@ export {
   verifyEmail,
   loginUser,
   refreshTokenRoute,
-  protectRoute,
-  logoutUser,
   // getInfoUser,
   getAllUsers,
   // changePassword,
