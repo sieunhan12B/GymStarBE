@@ -4,65 +4,98 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
-// LOG ĐỂ KIỂM TRA
-console.log("MODE:", process.env.NODE_ENV || "production");
-console.log("DATABASE_URL:", process.env.DATABASE_URL);
+// LOG ra để kiểm tra môi trường
+console.log("MODE:", process.env.NODE_ENV || "development");
+console.log("DATABASE_URL:", process.env.DATABASE_URL || "(none)");
 
-// CHỈ DÙNG DATABASE_URL TỪ RENDER.COM
-const sequelize = new Sequelize(process.env.DATABASE_URL, {
-  dialect: "postgres",
-  logging: process.env.NODE_ENV === "development" ? console.log : false,
+// ⚙️ 1️⃣ Nếu có DATABASE_URL (Render), thì dùng luôn
+let sequelize;
 
-  // SSL BẮT BUỘC CHO RENDER.COM
-  dialectOptions: {
-    ssl: {
-      require: true,
-      rejectUnauthorized: false, // Chấp nhận cert tự ký của Render
+if (process.env.DATABASE_URL) {
+  sequelize = new Sequelize(process.env.DATABASE_URL, {
+    dialect: "postgres",
+    logging: process.env.NODE_ENV === "development" ? console.log : false,
+    dialectOptions: {
+      ssl: {
+        require: true,
+        rejectUnauthorized: false,
+      },
     },
-  },
+    define: {
+      timestamps: true,
+      underscored: true,
+      freezeTableName: true,
+    },
+    pool: {
+      max: 10,
+      min: 0,
+      acquire: 60000,
+      idle: 10000,
+    },
+    retry: {
+      match: [
+        /ECONNRESET/,
+        /ETIMEDOUT/,
+        /ESOCKETTIMEDOUT/,
+        /ENOTFOUND/,
+        /Connection terminated/,
+        /SequelizeConnectionError/,
+      ],
+      max: 15,
+    },
+  });
 
-  define: {
-    timestamps: true,
-    underscored: true,
-    freezeTableName: true,
-  },
+  console.log("🟢 Dùng DATABASE_URL (Render/Production)");
+}
 
-  // POOL SIÊU ỔN ĐỊNH
-  pool: {
-    max: 10,
-    min: 0,
-    acquire: 60000,
-    idle: 10000,
-  },
+// ⚙️ 2️⃣ Nếu không có DATABASE_URL (Local), tạo thủ công
+else {
+  sequelize = new Sequelize(
+    process.env.DB_NAME,
+    process.env.DB_USER,
+    process.env.DB_PASSWORD,
+    {
+      host: process.env.DB_HOST,
+      port: process.env.DB_PORT || 5432,
+      dialect: "postgres",
+      logging: process.env.NODE_ENV === "development" ? console.log : false,
+      dialectOptions: {
+        ssl:
+          process.env.DB_SSL === "true"
+            ? { require: true, rejectUnauthorized: false }
+            : false,
+      },
+      define: {
+        timestamps: true,
+        underscored: true,
+        freezeTableName: true,
+      },
+      pool: {
+        max: 10,
+        min: 0,
+        acquire: 60000,
+        idle: 10000,
+      },
+    }
+  );
 
-  // TỰ ĐỘNG THỬ LẠI KHI MẤT KẾT NỐI
-  retry: {
-    match: [
-      /ECONNRESET/,
-      /ETIMEDOUT/,
-      /ESOCKETTIMEDOUT/,
-      /ENOTFOUND/,
-      /Connection terminated/,
-      /SequelizeConnectionError/,
-    ],
-    max: 15,
-  },
-});
+  console.log("🟢 Dùng DB thông thường (Local)");
+}
 
-// KẾT NỐI VỚI THỬ LẠI TỰ ĐỘNG
+// ⚙️ 3️⃣ Kết nối với retry
 const connectDB = async () => {
-  for (let i = 0; i < 10; i++) {
+  for (let i = 0; i < 5; i++) {
     try {
       await sequelize.authenticate();
-      console.log("KẾT NỐI POSTGRESQL THÀNH CÔNG TRÊN RENDER.COM!");
+      console.log("✅ KẾT NỐI DATABASE THÀNH CÔNG!");
       return;
     } catch (err) {
-      console.error(`Lần ${i + 1} kết nối thất bại:`, err.message);
-      if (i === 9) {
-        console.error("KHÔNG THỂ KẾT NỐI DB – DỪNG SERVER!");
+      console.error(`❌ Lần ${i + 1} thất bại:`, err.message);
+      if (i === 4) {
+        console.error("⛔ KHÔNG THỂ KẾT NỐI DB – DỪNG SERVER!");
         process.exit(1);
       }
-      await new Promise(res => setTimeout(res, 5000));
+      await new Promise((res) => setTimeout(res, 5000));
     }
   }
 };

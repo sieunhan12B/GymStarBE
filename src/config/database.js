@@ -1,34 +1,36 @@
-// src/config/database.js
-import { Sequelize } from 'sequelize';
-import dotenv from 'dotenv';
-dotenv.config();
+// ======================
+// ✅ src/config/database.js - FINAL VERSION (Local + Render)
+// ======================
 
-// === 1. FIX: ÉP BUỘC SSL LUÔN LUÔN, KỂ CẢ LOCAL (Render bắt buộc SSL 100%) ===
+import { Sequelize } from "sequelize";
+import dotenv from "dotenv";
+import path from "path";
+import { fileURLToPath } from "url";
+
+// ===== 1. Load file .env tương ứng môi trường =====
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const envFile =
+  process.env.NODE_ENV === "production" ? ".env.production" : ".env.local";
+
+dotenv.config({ path: path.join(__dirname, "../../", envFile) });
+console.log(`🔹 Loaded env file for DB: ${envFile}`);
+
+// ===== 2. Kiểm tra biến môi trường =====
 if (!process.env.DB_PASSWORD) {
-  throw new Error('DB_PASSWORD không tồn tại trong .env!');
+  throw new Error("❌ DB_PASSWORD không tồn tại trong file .env!");
 }
 
-const password = String(process.env.DB_PASSWORD).trim();
+// ===== 3. Cấu hình Sequelize =====
+const isProduction = process.env.NODE_ENV === "production";
 
 const sequelize = new Sequelize(
   process.env.DB_NAME,
   process.env.DB_USER,
-  password,
+  String(process.env.DB_PASSWORD).trim(),
   {
     host: process.env.DB_HOST,
-    port: Number(process.env.DB_PORT) || 5432, // ← ĐÚNG PORT 5432, KHÔNG ĐỂ 5433
-
-    dialect: 'postgres',
-
-    // === 2. FIX: BẬT SSL LUÔN LUÔN, KHÔNG CHỈ PRODUCTION ===
-    // Render sẽ NGẮT KẾT NỐI NGAY nếu không có SSL → ECONNRESET
-    dialectOptions: {
-      ssl: {
-        require: true,
-        rejectUnauthorized: false // Render dùng cert tự ký
-      }
-    },
-
+    port: Number(process.env.DB_PORT) || 5432,
+    dialect: "postgres",
     logging: false,
 
     define: {
@@ -39,41 +41,31 @@ const sequelize = new Sequelize(
     pool: {
       max: 5,
       min: 0,
-      acquire: 60000,  // Tăng timeout lên 60s (mạng VN chậm hay bị reset)
+      acquire: 60000, // tăng timeout
       idle: 10000,
     },
 
-    // === 3. FIX: THÊM retry + reconnect tự động ===
-    retry: {
-      match: [
-        /ECONNRESET/,
-        /ETIMEDOUT/,
-        /ESOCKETTIMEDOUT/,
-        /EHOSTUNREACH/,
-        /ECONNREFUSED/,
-        /Connection terminated/,
-      ],
-      max: 5,
-    },
-    dialectOptions: {
-      ...((process.env.NODE_ENV === 'production' || process.env.DB_SSL === 'true') && {
-        ssl: {
-          require: true,
-          rejectUnauthorized: false
+    // ===== 4. SSL: chỉ bật ở production =====
+    dialectOptions: isProduction
+      ? {
+          ssl: {
+            require: true,
+            rejectUnauthorized: false, // Render dùng chứng chỉ tự ký
+          },
         }
-      })
-    }
+      : {},
   }
 );
 
-// Test kết nối ngay khi khởi động
-sequelize.authenticate()
+// ===== 5. Test kết nối =====
+sequelize
+  .authenticate()
   .then(() => {
-    console.log('✅ KẾT NỐI DATABASE THÀNH CÔNG: Render PostgreSQL');
+    console.log("✅ KẾT NỐI DATABASE THÀNH CÔNG:", process.env.DB_HOST);
   })
-  .catch(err => {
-    console.error('❌ LỖI KẾT NỐI DATABASE:', err.message);
-    process.exit(1); // Dừng luôn nếu không kết nối được
+  .catch((err) => {
+    console.error("❌ LỖI KẾT NỐI DATABASE:", err.message);
+    process.exit(1);
   });
 
 export default sequelize;
