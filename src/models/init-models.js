@@ -6,7 +6,6 @@ import _feedback_reply from  "./feedback_reply.js";
 import _feedbacks from  "./feedbacks.js";
 import _order_details from  "./order_details.js";
 import _orders from  "./orders.js";
-import _tokens from  "./tokens.js";
 import _payments from  "./payments.js";
 import _product_images from  "./product_images.js";
 import _product_variants from  "./product_variants.js";
@@ -25,7 +24,6 @@ export default function initModels(sequelize) {
   const feedbacks = _feedbacks.init(sequelize, DataTypes);
   const order_details = _order_details.init(sequelize, DataTypes);
   const orders = _orders.init(sequelize, DataTypes);
-  const tokens = _tokens.init(sequelize, DataTypes);
   const payments = _payments.init(sequelize, DataTypes);
   const product_images = _product_images.init(sequelize, DataTypes);
   const product_variants = _product_variants.init(sequelize, DataTypes);
@@ -42,7 +40,7 @@ export default function initModels(sequelize) {
   products.belongsTo(categories, { as: "category", foreignKey: "category_id"});
   categories.hasMany(products, { as: "products", foreignKey: "category_id"});
   feedback_reply.belongsTo(feedbacks, { as: "feedback", foreignKey: "feedback_id"});
-  feedbacks.hasMany(feedback_reply, { as: "feedback_replies", foreignKey: "feedback_id"});
+  feedbacks.hasOne(feedback_reply, { as: "feedback_reply", foreignKey: "feedback_id"});
   reviews.belongsTo(order_details, { as: "order_detail", foreignKey: "order_detail_id"});
   order_details.hasMany(reviews, { as: "reviews", foreignKey: "order_detail_id"});
   order_details.belongsTo(orders, { as: "order", foreignKey: "order_id"});
@@ -62,7 +60,7 @@ export default function initModels(sequelize) {
   review_images.belongsTo(reviews, { as: "review", foreignKey: "review_id"});
   reviews.hasMany(review_images, { as: "review_images", foreignKey: "review_id"});
   review_reply.belongsTo(reviews, { as: "review", foreignKey: "review_id"});
-  reviews.hasMany(review_reply, { as: "review_replies", foreignKey: "review_id"});
+  reviews.hasOne(review_reply, { as: "review_reply", foreignKey: "review_id"});
   carts.belongsTo(users, { as: "user", foreignKey: "user_id"});
   users.hasMany(carts, { as: "carts", foreignKey: "user_id"});
   feedback_reply.belongsTo(users, { as: "user", foreignKey: "user_id"});
@@ -71,8 +69,6 @@ export default function initModels(sequelize) {
   users.hasMany(feedbacks, { as: "feedbacks", foreignKey: "user_id"});
   orders.belongsTo(users, { as: "user", foreignKey: "user_id"});
   users.hasMany(orders, { as: "orders", foreignKey: "user_id"});
-  tokens.belongsTo(users, { as: "user", foreignKey: "user_id"});
-  users.hasMany(tokens, { as: "tokens", foreignKey: "user_id"});
   review_reply.belongsTo(users, { as: "user", foreignKey: "user_id"});
   users.hasMany(review_reply, { as: "review_replies", foreignKey: "user_id"});
   user_addresses.belongsTo(users, { as: "user", foreignKey: "user_id"});
@@ -85,7 +81,6 @@ export default function initModels(sequelize) {
     feedbacks,
     order_details,
     orders,
-    tokens,
     payments,
     product_images,
     product_variants,

@@ -17,14 +17,14 @@ export default class users extends Model {
     email: {
       type: DataTypes.STRING(100),
       allowNull: false,
-      unique: "users_email_key3"
+      unique: "users_email_key"
     },
     password: {
       type: DataTypes.STRING(255),
       allowNull: false
     },
     gender: {
-      type: DataTypes.ENUM("male","female","other"),
+      type: DataTypes.STRING(10),
       allowNull: true
     },
     birth_date: {
@@ -49,27 +49,6 @@ export default class users extends Model {
     indexes: [
       {
         name: "users_email_key",
-        unique: true,
-        fields: [
-          { name: "email" },
-        ]
-      },
-      {
-        name: "users_email_key1",
-        unique: true,
-        fields: [
-          { name: "email" },
-        ]
-      },
-      {
-        name: "users_email_key2",
-        unique: true,
-        fields: [
-          { name: "email" },
-        ]
-      },
-      {
-        name: "users_email_key3",
         unique: true,
         fields: [
           { name: "email" },

@@ -18,7 +18,7 @@ export default class feedbacks extends Model {
         key: 'user_id'
       }
     },
-    title: {
+    type: {
       type: DataTypes.STRING(255),
       allowNull: false
     },
