@@ -4,7 +4,9 @@ import { Op } from "sequelize";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import dotenv from "dotenv";
-import transporter from "../config/email.js";
+
+// IMPORT SENDGRID EMAIL SERVICE
+import { sendVerificationEmail, sendConfirmationEmail } from "../config/email.js";
 
 dotenv.config();
 
@@ -24,7 +26,7 @@ const registerUser = async (req, res) => {
       if (existingUser.status === true)
         return res.status(400).json({ message: "Email đã được đăng ký" });
       else
-        await existingUser.destroy(); // xóa user cũ chưa xác nhận để đăng ký lại
+        await existingUser.destroy(); // xóa user cũ chưa xác nhận
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
@@ -41,42 +43,19 @@ const registerUser = async (req, res) => {
       process.env.ACCESS_TOKEN_SECRET,
       { expiresIn: "15m" }
     );
-console.log("✅ TOKEN XÁC NHẬN:", verificationToken);
-    await sendVerificationEmail(newUser.email, verificationToken);
-    return res.status(201).json({ message: "Đăng ký thành công, vui lòng xác nhận email" });
 
-    
+    console.log("TOKEN XÁC NHẬN:", verificationToken);
+
+    // DÙNG SENDGRID
+    await sendVerificationEmail(newUser.email, verificationToken);
+
+    return res.status(201).json({ message: "Đăng ký thành công, vui lòng xác nhận email" });
   } catch (error) {
     console.error("Lỗi đăng ký:", error);
     return res.status(500).json({ message: "Lỗi server" });
   }
 };
 
-/** ============ GỬI EMAIL XÁC NHẬN ============ */
-const sendVerificationEmail = async (email, token) => {
-  const verifyLink = `http://localhost:5000/QuanLyNguoiDung/verify-email?token=${token}`;
-
-  await transporter.sendMail({
-    from: `"GymStar" <${process.env.EMAIL_USER}>`,
-    to: email,
-    subject: "Xác nhận email đăng ký GymStar",
-    html: `
-      <div style="font-family: Arial, sans-serif; padding: 20px;">
-        <h2 style="color: #e53e3e;">Xác nhận tài khoản GymStar</h2>
-        <p>Nhấn vào nút bên dưới để xác nhận tài khoản của bạn:</p>
-        <a href="${verifyLink}" 
-           style="display:inline-block; background:#e53e3e; color:#fff; padding:10px 20px; text-decoration:none; border-radius:5px;">
-           Xác nhận ngay
-        </a>
-        <p>Liên kết này sẽ hết hạn sau <strong>15 phút</strong>.</p>
-      </div>
-    `,
-  });
-
-  console.log("Đã gửi email xác nhận đến:", email);
-};
-
-/** ============ XÁC NHẬN EMAIL ============ */
 /** ============ XÁC NHẬN EMAIL ============ */
 const verifyEmail = async (req, res) => {
   const { token } = req.query;
@@ -91,7 +70,6 @@ const verifyEmail = async (req, res) => {
   }
 
   try {
-    // BƯỚC 1: Xác thực token hợp lệ
     const decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
     const user = await model.users.findByPk(decoded.user_id);
 
@@ -108,7 +86,7 @@ const verifyEmail = async (req, res) => {
         <div style="text-align:center; padding:60px; font-family: Arial, sans-serif;">
           <h3 style="color:#48bb78;">Tài khoản đã được xác nhận trước đó</h3>
           <p>Bạn có thể đăng nhập ngay bây giờ.</p>
-          <a href="http://localhost:5173/login"
+          <a href="${process.env.CLIENT_URL || 'http://localhost:5173'}/login"
              style="background:#48bb78; color:white; padding:12px 24px; text-decoration:none; border-radius:8px; font-weight:bold;">
              Đăng nhập
           </a>
@@ -116,18 +94,18 @@ const verifyEmail = async (req, res) => {
       `);
     }
 
-    // BƯỚC 2: Kích hoạt tài khoản
     await user.update({ status: true });
+
+    // DÙNG SENDGRID
     await sendConfirmationEmail(user.email, user.full_name);
 
-    // BƯỚC 3: Thành công
     return res.send(`
       <div style="text-align:center; padding:60px; font-family: Arial, sans-serif; background:#f7fafc; min-height:100vh;">
         <div style="background:white; padding:40px; border-radius:12px; box-shadow:0 4px 12px rgba(0,0,0,0.1); max-width:500px; margin:0 auto;">
           <h2 style="color:#48bb78; margin-bottom:16px;">Xác nhận thành công!</h2>
           <p style="font-size:16px; color:#2d3748;">Chào mừng <strong>${user.full_name}</strong> đến với <strong>GymStar</strong>!</p>
           <p style="color:#718096; margin:20px 0;">Tài khoản của bạn đã được kích hoạt.</p>
-          <a href="http://localhost:5173/login"
+          <a href="${process.env.CLIENT_URL || 'http://localhost:5173'}/login"
              style="display:inline-block; background:#48bb78; color:white; padding:12px 28px; text-decoration:none; border-radius:8px; font-weight:bold; margin-top:20px;">
              Đăng nhập ngay
           </a>
@@ -138,7 +116,6 @@ const verifyEmail = async (req, res) => {
   } catch (err) {
     console.error("Lỗi verifyEmail:", err);
 
-    // BƯỚC 4: XỬ LÝ TOKEN HẾT HẠN → TỰ ĐỘNG GỬI LẠI
     if (err.name === "TokenExpiredError") {
       try {
         const decoded = jwt.decode(token);
@@ -163,24 +140,22 @@ const verifyEmail = async (req, res) => {
           return res.send(`
             <div style="text-align:center; padding:60px; font-family: Arial, sans-serif;">
               <h3 style="color:#48bb78;">Tài khoản đã được xác nhận</h3>
-              <a href="http://localhost:5173/login" style="background:#48bb78; color:white; padding:12px 24px; text-decoration:none; border-radius:8px;">
+              <a href="${process.env.CLIENT_URL || 'http://localhost:5173'}/login" style="background:#48bb78; color:white; padding:12px 24px; text-decoration:none; border-radius:8px;">
                 Đăng nhập
               </a>
             </div>
           `);
         }
 
-        // TẠO TOKEN MỚI
         const newToken = jwt.sign(
           { user_id: user.user_id, email: user.email },
           process.env.ACCESS_TOKEN_SECRET,
           { expiresIn: "15m" }
         );
 
-        // GỬI LẠI EMAIL XÁC NHẬN
+        // DÙNG SENDGRID
         await sendVerificationEmail(user.email, newToken);
 
-        // THÔNG BÁO CHO NGƯỜI DÙNG
         return res.send(`
           <div style="text-align:center; padding:60px; font-family: Arial, sans-serif; background:#fff5f5; min-height:100vh;">
             <div style="background:white; padding:40px; border-radius:12px; box-shadow:0 4px 12px rgba(0,0,0,0.1); max-width:500px; margin:0 auto;">
@@ -211,7 +186,6 @@ const verifyEmail = async (req, res) => {
       }
     }
 
-    // CÁC LỖI KHÁC (token sai, bị sửa, v.v.)
     return res.status(400).send(`
       <div style="text-align:center; padding:60px; font-family: Arial, sans-serif;">
         <h3 style="color:#e53e3e;">Mã xác nhận không hợp lệ</h3>
@@ -219,26 +193,6 @@ const verifyEmail = async (req, res) => {
       </div>
     `);
   }
-};
-
-/** ============ EMAIL CHÀO MỪNG ============ */
-const sendConfirmationEmail = async (email, full_name) => {
-  await transporter.sendMail({
-    from: `"GymStar" <${process.env.EMAIL_USER}>`,
-    to: email,
-    subject: "Chào mừng đến với GymStar!",
-    html: `
-      <div style="font-family: Arial, sans-serif; padding: 20px;">
-        <h2 style="color: #e53e3e;">Xin chào ${full_name}!</h2>
-        <p>Tài khoản của bạn đã được kích hoạt thành công.</p>
-        <a href="http://localhost:5173/login" 
-           style="display:inline-block; background:#e53e3e; color:#fff; padding:10px 20px; text-decoration:none; border-radius:5px;">
-           Đăng nhập ngay
-        </a>
-      </div>
-    `,
-  });
-  console.log("Đã gửi email chào mừng:", email);
 };
 
 /** ============ ĐĂNG NHẬP ============ */
@@ -361,8 +315,6 @@ const getAllUsers = async (req, res) => {
 
 export {
   registerUser,
-  sendVerificationEmail,
-  sendConfirmationEmail,
   verifyEmail,
   loginUser,
   refreshTokenRoute,
